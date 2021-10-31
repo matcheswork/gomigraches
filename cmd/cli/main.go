@@ -34,20 +34,24 @@ func main() {
 
 	psqlDB, err := sqlx.Connect("postgres", pqConnURI)
 	if err != nil {
-		fmt.Printf("%+v", errors.WithStack(err))
+		fmt.Printf("%+v\n", errors.WithStack(err))
 		return
 	}
 
-	rup := migraches.NewRollupService(psqlDB, []string{createMockTableQ})
+	rup := migraches.NewRollupService(psqlDB, []string{toRollup})
 
 	err = rup.Rollup(dbName)
 	if err != nil {
-		fmt.Printf("%+v", errors.WithStack(err))
+		fmt.Printf("%+v\n", err)
 		return
 	}
 }
 
-var createMockTableQ string = `CREATE TABLE mock (
-	id serial primary key,
-	created_at timestamp not null default CURRENT_TIMESTAMP
-)`
+var toRollup string = `CREATE TABLE mock (
+		id serial primary key,
+		created_at timestamp not null default CURRENT_TIMESTAMP
+	);
+	
+	GRANT ALL PRIVILEGES ON mock TO mock_user;
+
+	GRANT USAGE, SELECT ON SEQUENCE mock_id_seq TO mock_user;`

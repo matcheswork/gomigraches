@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 type Rollupper interface {
@@ -23,17 +24,31 @@ var ErrNilDB error = fmt.Errorf("ErrNilDB")
 var ErrZeroCreateTableQs error = fmt.Errorf("ErrZeroCreateTableQs")
 var ErrNilCreateTableQs error = fmt.Errorf("ErrNilCreateTableQs")
 
-func NewRollupService(db *sqlx.DB, createTableQs []string) *RollupService {
+/*
+	NewRollupService creates RullupService with
+	provided meta database and keep create table
+	queries in memory. The create table query may include multiple queries:
+
+	CREATE TABLE mock (
+		id serial primary key,
+		created_at timestamp not null default CURRENT_TIMESTAMP
+	);
+
+	GRANT ALL PRIVILEGES ON mock TO mock_user;
+
+	GRANT USAGE, SELECT ON SEQUENCE mock_id_seq TO mock_user;
+*/
+func NewRollupService(metaDB *sqlx.DB, createTableQs []string) *RollupService {
 	return &RollupService{
-		db,
-		createTableQs,
+		db:            metaDB,
+		createTableQs: createTableQs,
 	}
 }
 
 // Rollup created database with provided name
 // and rolles up tables that was provided
 // in NewRollupService constructor
-func (r *RollupService) Rollup(name string) error {
+func (r *RollupService) Rollup(name string) (err error) {
 	// prevent nil db
 	if r.db == nil {
 		return ErrNilDB
@@ -49,15 +64,17 @@ func (r *RollupService) Rollup(name string) error {
 		return ErrZeroCreateTableQs
 	}
 
-	err := r.rollupDB(name)
+	err = r.rollupDB(name)
 	if err != nil {
 		return err
 	}
+	dbCreated := true
 
 	err = r.rollupUser(name)
 	if err != nil {
 		return err
 	}
+	userCreated := true
 
 	createdDB, err := connect(name)
 	if err != nil {
@@ -66,20 +83,26 @@ func (r *RollupService) Rollup(name string) error {
 
 	tx, err := createdDB.BeginTx(context.Background(), nil)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	var txErr error
-
 	defer func() {
-		defer createdDB.Close()
-
-		if txErr != nil {
+		if err != nil {
 			// ignore error, but should be handled
-			tx.Rollback()
+			if tx != nil {
+				tx.Rollback()
+			}
 
-			r.rollbackDB(name)
-			r.rollbackUser(name)
+			// close created db if opened
+			createdDB.Close()
+
+			if dbCreated {
+				r.rollbackDB(name)
+			}
+
+			if userCreated {
+				r.rollbackUser(name)
+			}
 
 			return
 		}
@@ -88,11 +111,11 @@ func (r *RollupService) Rollup(name string) error {
 	}()
 
 	for _, tq := range r.createTableQs {
-		txErr = r.rollupTable(name, tq, tx)
-		if txErr != nil {
-			return txErr
+		err = r.rollupTable(name, tq, tx)
+		if err != nil {
+			return err
 		}
 	}
 
-	return nil
+	return
 }

@@ -3,6 +3,8 @@ package migraches
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 func connect(dbname string) (*sql.DB, error) {
@@ -11,7 +13,7 @@ func connect(dbname string) (*sql.DB, error) {
 
 	db, err := sql.Open("postgres", pqConnURI)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return db, nil
