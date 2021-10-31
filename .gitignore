@@ -1,0 +1,32 @@
+# Ignore all
+*
+# Unignore go files and folders
+!*.*
+!*/
+!.*
+# Ignore .exe
+*.exe
+# Ignore certs
+*.crt
+*.cert
+*.key
+*.pem
+# Ignore env variables
+*.env
+.DS_Store
+
+# ignore coverage files and folders
+coverage
+coverage.out
+# ignore build folders
+build
+# ignore node.js modules folders
+node_modules
+# ignore frontend folder
+frontend
+
+# skip "!"
+!Makefile
+
+# ignore database
+*.db
