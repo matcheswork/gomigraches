@@ -97,18 +97,9 @@ var ErrZeroCreateTableQs error = fmt.Errorf("ErrZeroCreateTableQs")
 var ErrNilCreateTableQs error = fmt.Errorf("ErrNilCreateTableQs")
 
 /*
-	NewRollupService creates RullupService with
-	provided meta database and keep create table
-	queries in memory. The create table query may include multiple queries:
-
-	CREATE TABLE mock (
-		id serial primary key,
-		created_at timestamp not null default CURRENT_TIMESTAMP
-	);
-
-	GRANT ALL PRIVILEGES ON mock TO mock_user;
-
-	GRANT USAGE, SELECT ON SEQUENCE mock_id_seq TO mock_user;
+	NewRollupService creates RollupService with
+	provided meta database and keeps tables
+	schemas in Table structs in memory.
 */
 func NewRollupService(metaDB *sqlx.DB, tables []Table) *RollupService {
 	return &RollupService{
@@ -119,7 +110,7 @@ func NewRollupService(metaDB *sqlx.DB, tables []Table) *RollupService {
 
 // Rollup created database with provided name
 // and rolles up tables that was provided
-// in NewRollupService constructor
+// with NewRollupService constructor
 func (r *RollupService) Rollup(name string) (err error) {
 	// prevent nil db
 	if r.db == nil {
