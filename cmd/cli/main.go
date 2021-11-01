@@ -38,7 +38,16 @@ func main() {
 		return
 	}
 
-	rup := migraches.NewRollupService(psqlDB, []string{toRollup})
+	rup := migraches.NewRollupService(psqlDB, []migraches.Table{
+		{
+			Name: "mock",
+			Fields: []string{
+				"id serial primary key",
+				"created_at timestamp not null default CURRENT_TIMESTAMP",
+			},
+			WithSeq: true,
+		},
+	})
 
 	err = rup.Rollup(dbName)
 	if err != nil {
@@ -46,12 +55,3 @@ func main() {
 		return
 	}
 }
-
-var toRollup string = `CREATE TABLE mock (
-		id serial primary key,
-		created_at timestamp not null default CURRENT_TIMESTAMP
-	);
-	
-	GRANT ALL PRIVILEGES ON mock TO mock_user;
-
-	GRANT USAGE, SELECT ON SEQUENCE mock_id_seq TO mock_user;`

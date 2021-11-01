@@ -3,6 +3,7 @@ package migraches
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -12,12 +13,83 @@ type Rollupper interface {
 	Rollup(dbname string) error
 }
 
+type Table struct {
+	Name string
+
+	/*
+		Fields must contain fields of
+		table:
+
+		[]string{
+			"id serial primary key",
+			"created_at timestamp not null default CURRENT_TIMESTAMP",
+			"created_by int not null",
+		}
+	*/
+	Fields []string
+
+	/*
+		WithSeq means that table has
+		primary key with autoincrement
+		id sequence.
+		If true it runs grant access query as:
+
+		GRANT USAGE, SELECT ON SEQUENCE {.Name}_id_seq TO {.Owner};
+	*/
+	WithSeq bool
+
+	/*
+		compiled the optimisation that contains the result
+		of table.Srting() method.
+	*/
+	compiled string
+}
+
+// String implements Stringer interface
+// and returns the ready for execute
+// create table query string.
+//
+// First run caches result at Table.compiled
+// and retuns it in each subsequent call
+func (t *Table) String() string {
+	if t.compiled != "" {
+		return t.compiled
+	}
+
+	space := " "
+	comma := ","
+
+	var columns string
+
+	for idx, field := range t.Fields {
+		if idx == len(t.Fields)-1 {
+			columns += field
+			break
+		}
+
+		columns += field + comma
+	}
+
+	// prepare create table query
+	q := strings.Join(
+		[]string{
+			fmt.Sprintf("CREATE TABLE %s", t.Name),
+			"(",
+			columns,
+			");",
+		},
+		space,
+	)
+
+	return q
+}
+
 // RollupService is a 'postgres' implementation
 // or Rollupper interface.
 // Please use NewRollupService constructor only
 type RollupService struct {
-	db            *sqlx.DB
-	createTableQs []string
+	db     *sqlx.DB
+	tables []Table
 }
 
 var ErrNilDB error = fmt.Errorf("ErrNilDB")
@@ -38,10 +110,10 @@ var ErrNilCreateTableQs error = fmt.Errorf("ErrNilCreateTableQs")
 
 	GRANT USAGE, SELECT ON SEQUENCE mock_id_seq TO mock_user;
 */
-func NewRollupService(metaDB *sqlx.DB, createTableQs []string) *RollupService {
+func NewRollupService(metaDB *sqlx.DB, tables []Table) *RollupService {
 	return &RollupService{
-		db:            metaDB,
-		createTableQs: createTableQs,
+		db:     metaDB,
+		tables: tables,
 	}
 }
 
@@ -55,12 +127,12 @@ func (r *RollupService) Rollup(name string) (err error) {
 	}
 
 	// prevent nil qs arr
-	if r.createTableQs == nil {
+	if r.tables == nil {
 		return ErrNilCreateTableQs
 	}
 
 	// prevent zero qs arr
-	if len(r.createTableQs) == 0 {
+	if len(r.tables) == 0 {
 		return ErrZeroCreateTableQs
 	}
 
@@ -110,10 +182,22 @@ func (r *RollupService) Rollup(name string) (err error) {
 		tx.Commit()
 	}()
 
-	for _, tq := range r.createTableQs {
-		err = r.rollupTable(name, tq, tx)
+	for _, table := range r.tables {
+		err = r.rollupTableTx(name, table.String(), tx)
 		if err != nil {
 			return err
+		}
+
+		err = r.rollupTablePrivilegesTx(name, table.Name, tx)
+		if err != nil {
+			return err
+		}
+
+		if table.WithSeq {
+			err = r.rollupIDSeqPrivilegesTx(name, table.Name, tx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
