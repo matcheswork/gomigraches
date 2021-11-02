@@ -81,6 +81,9 @@ func (t *Table) String() string {
 		space,
 	)
 
+	// cache
+	t.compiled = q
+
 	return q
 }
 
