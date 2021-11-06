@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/jmoiron/sqlx"
@@ -15,7 +17,13 @@ func main() {
 	args := os.Args[1:]
 
 	if len(args) < 3 {
-		fmt.Println("please provide database name to create: ./gomigraches db_to_create_name meta_db_name meta_db_user")
+		fmt.Println("please provide required data:")
+		fmt.Printf("\n%s\n%s\n%s\n\n",
+			"db_to_create_name - database name that you want to rollup",
+			"meta_db_name - database that has access to create new databases and roles",
+			"meta_db_user - the role that has access to create new databases and roles",
+		)
+		fmt.Println("./gomigraches db_to_create_name meta_db_name meta_db_user")
 		return
 	}
 
@@ -29,29 +37,40 @@ func main() {
 
 	fmt.Scanf("%s", &metaDBPassword)
 
-	pqConnURI := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+	manageDSN := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		"localhost", 5432, metaDBUser, metaDBPassword, metaDBName)
 
-	psqlDB, err := sqlx.Connect("postgres", pqConnURI)
+	psqlDB, err := sqlx.Connect("postgres", manageDSN)
 	if err != nil {
 		fmt.Printf("%+v\n", errors.WithStack(err))
 		return
 	}
 
-	rup := migraches.NewRollupService(psqlDB, []migraches.Table{
-		{
-			Name: "mock",
-			Fields: []string{
-				"id serial primary key",
-				"created_at timestamp not null default CURRENT_TIMESTAMP",
-			},
-			WithSeq: true,
-		},
-	})
+	file, err := ioutil.ReadFile("./tables.json")
+	if err != nil {
+		fmt.Printf("%+v\n", errors.WithStack(err))
+		return
+	}
+
+	tables := []migraches.Table{}
+
+	err = json.Unmarshal(file, &tables)
+	if err != nil {
+		fmt.Printf("%+v\n", errors.WithStack(err))
+		return
+	}
+	if len(tables) == 0 {
+		fmt.Printf("%+v\n", errors.WithStack(migraches.ErrNoTables))
+		return
+	}
+
+	rup := migraches.NewRollupService(psqlDB, tables)
 
 	err = rup.Rollup(dbName)
 	if err != nil {
 		fmt.Printf("%+v\n", err)
 		return
 	}
+
+	fmt.Printf("database '%s' rolled up\n", dbName)
 }

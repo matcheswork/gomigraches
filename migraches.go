@@ -14,7 +14,7 @@ type Rollupper interface {
 }
 
 type Table struct {
-	Name string
+	Name string `json:"name"`
 
 	/*
 		Fields must contain fields of
@@ -26,7 +26,7 @@ type Table struct {
 			"created_by int not null",
 		}
 	*/
-	Fields []string
+	Fields []string `json:"fields"`
 
 	/*
 		WithSeq means that table has
@@ -36,7 +36,7 @@ type Table struct {
 
 		GRANT USAGE, SELECT ON SEQUENCE {.Name}_id_seq TO {.Owner};
 	*/
-	WithSeq bool
+	WithSeq bool `json:"with_seq,omitempty"`
 
 	/*
 		compiled the optimisation that contains the result
@@ -94,10 +94,6 @@ type RollupService struct {
 	db     *sqlx.DB
 	tables []Table
 }
-
-var ErrNilDB error = fmt.Errorf("ErrNilDB")
-var ErrZeroCreateTableQs error = fmt.Errorf("ErrZeroCreateTableQs")
-var ErrNilCreateTableQs error = fmt.Errorf("ErrNilCreateTableQs")
 
 /*
 	NewRollupService creates RollupService with

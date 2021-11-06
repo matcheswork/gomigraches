@@ -1,0 +1,12 @@
+[
+    {
+        "name": "table_name",
+        "fields": [
+            "id serial primary key",
+			"created_at timestamp not null default CURRENT_TIMESTAMP"
+        ],
+        // with seq is true because of field id that is serial primary key
+        "with_seq": true
+    }
+    // ...
+]

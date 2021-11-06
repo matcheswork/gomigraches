@@ -8,10 +8,10 @@ import (
 )
 
 func connect(dbname string) (*sql.DB, error) {
-	pqConnURI := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		"localhost", 5432, dbname, "", dbname)
 
-	db, err := sql.Open("postgres", pqConnURI)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

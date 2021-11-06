@@ -30,3 +30,6 @@ frontend
 
 # ignore database
 *.db
+
+# ignore .json
+tables.json
