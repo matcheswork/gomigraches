@@ -21,3 +21,13 @@ go build
 ```
 
 ### Create `tables.json` file as `tables.json.example`
+
+```bash
+# go to cli folder
+cd ./cmd/cli
+
+# copy file
+cp tables.json.example tables.json
+```
+
+Fill up with your tables
